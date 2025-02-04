@@ -8,23 +8,176 @@ bedrock = session.client(service_name='bedrock-runtime', region_name="us-east-1"
 modelId = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 memory_list = []
 
+tool_list = [
+    {
+        "toolSpec": {
+            "name": "application_design",
+            "description": "Design an application based on the user's requirements.",
+            "inputSchema": {
+                "json": {
+                    "type": "object",  # Change type to object
+                    "properties": {
+                        "request_type": {
+                            "type": "string",
+                            "description": "The type of request. Always set to 'application_design'.",
+                            "enum": ["application_design"]
+                        },
+                        "application_details": {
+                            "type": "object",
+                            "properties": {
+                                "applicationName": {
+                                    "type": "string",
+                                    "description": "A name that suits the app in Capitalized case, restrict to at most 3 words, Example: UserManagementPortal"
+                                },
+                                "applicationDescription":{
+                                    "type": "string",
+                                    "description": "a one or two lines short description of the app",
+                                    "maxLength": 50
+                                },
+                                "applicationTablePrefix": {
+                                    "type": "string",
+                                    "description": "a unique 3 or 4 letter prefix for the application, example QNT for Qoonity, UMPL for UserManagementPortal",
+                                    "maxLength": 4
+                                }
+
+                            }
+                        },
+                        "entities": {  # Wrap the array in an object property
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "entityName": {
+                                        "type": "string",
+                                        "description": "The name of the entity."
+                                    },
+                                    "attributes": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "attributeName": {
+                                                    "type": "string",
+                                                    "description": "The name of the attribute."
+                                                },
+                                                "dataType": {
+                                                    "type": "string",
+                                                    "description": "The data type of the attribute."
+                                                },
+                                                "isPrimaryKey": {
+                                                    "type": "boolean",
+                                                    "description": "If the attribute is the primary key for that entity."
+                                                },
+                                                "foreignKey": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "isForeignKey": {
+                                                            "type": "boolean",
+                                                            "description": "If the attribute is a foreign key."
+                                                        },
+                                                        "foreignKeyRefrenceEntity": {
+                                                            "type": "string",
+                                                            "description": "The entity the attribute is a foreign key to. Return NA if not applicable. Always return value even if not applicable."
+                                                        },
+                                                        "foreignKeyRefrenceAttribute": {
+                                                            "type": "string",
+                                                            "description": "The attribute the foreign key references. Return NA if not applicable. Always return value even if not applicable"
+                                                        }
+                                                    },
+                                                    "required": ["isForeignKey", "foreignKeyRefrenceEntity", "foreignKeyRefrenceAttribute"]
+                                                    
+                                                }
+                                            },
+                                            "required": ["attributeName", "DataType", "isPrimaryKey", "foreignKey"]
+                                        }
+                                    }
+                                },
+                                "required": ["entityName", "attributes"]
+                            }
+                        },
+                        "response": {
+                            "type": "string",
+                            "description": """
+                            The response to the user summarizing the application design and thought process, highlighting only very important details.
+                            Always ask for feedback and make suggestions to improve the design.
+                            The response should follow a causal conversational style.
+                            """,
+                           "maxLength": 500,
+                        }
+                    },
+                    "required": ["request_type", "entities", "response"]  # Require Entities and response
+                }
+            }
+        }
+    },
+    {
+        "toolSpec": {
+            "name": "generic_request",
+            "description": "Helps to interact with the user.",
+            "inputSchema": {
+                "json": {
+                    "type": "object",
+                    "properties": {
+                        "request_type": {
+                            "type": "string",
+                            "description": "The type of request. Always set to 'generic_request'.",
+                            "enum": ["generic_request"]
+                        },
+                        "response": {
+                            "type": "string",
+                            "description": "The response to the user.",
+                            "maxLength": 500
+                        }
+                    },
+                    "required": ["request_type", "response"]
+                }
+            }
+        }
+    }
+    
+]
+
 # Function to fetch a response from the model
 def get_completion(prompt, system_prompt=None):
     inference_config = {
-        "temperature": 0.0,
-        "maxTokens": 2000,
+        "temperature": 0.0
     }
+    tools = {
+                "tools": tool_list
+            }
+    
     converse_api_params = {
         "modelId": modelId,
         "messages": [{"role": "user", "content": [{"text": prompt}]}],
-        "inferenceConfig": inference_config
+        "inferenceConfig": inference_config,
+        "toolConfig": tools
     }
     if system_prompt:
         converse_api_params["system"] = [{"text": system_prompt}]
+    
+    
     try:
         response = bedrock.converse(**converse_api_params)
-        text_content = response['output']['message']['content'][0]['text']
-        return text_content
+
+        response_message = response['output']['message']
+
+        response_content_blocks = response_message['content']
+
+        content_block = next((block for block in response_content_blocks if 'toolUse' in block), None)
+
+        tool_use_block = content_block['toolUse']
+
+        tool_result_dict = tool_use_block['input']
+        
+        if "response" in tool_result_dict:
+            return tool_result_dict
+        return {
+                "request_type": "generic_request",
+                "response": response_message
+            }
+        
+
+            
 
     except ClientError as err:
         message = err.response['Error']['Message']
@@ -44,66 +197,31 @@ if os.path.exists(file_path):
 else:
     print("No memory file found, starting fresh.")
 
-while True:
+def get_response(prompt, system_prompt=None):
     try:
-        prompt = input("Enter your prompt (or type 'exit' to quit): ")
-        if prompt.lower() in ["exit", "quit"]:
-            print("\nExiting...")
-            break
-
         system_prompt = qoonity_head
         
         # Use the loaded memory when generating the completion
         response = get_completion(prompt + " " + str(memory_list), system_prompt)
         
         if response:  # Only process if the response is valid
-            memory_list.append(f"memory: {response}")
-            print("Response:", response)
+            memory_list.append(f"prompt: {prompt}, response: {response}")
+            #print("Response:", json.dumps(response, indent=4))
             #print("Memory:", memory_list)
 
             # Save memory to a file
             with open(file_path, 'w') as file:
                 json.dump(memory_list, file, indent=4)
+
             
             print(f"Memory successfully written to {file_path}")
+            return response
         else:
             print("No response from the model. Please try again.")
-                
-    except KeyboardInterrupt:
-        print("\nExiting...")
-        break
+            return None     
     except Exception as e:
         print(f"An error occurred: {e}")
 
 
 
-
-# answer = get_completion(prompt, system_prompt)
-# print(answer)
-# message_list = []
-
-# initial_message = {
-#     "role": "user",
-#     "content": [
-#         { "text": f"I want to build a edtech platform using {qoonity_head}" } 
-#     ],
-#     # "role": "assistant",
-#     # "content": [
-#     #     { "text": qoonity_head }
-#     # ],
-# }
-
-# message_list.append(initial_message)
-
-# response = bedrock.converse(
-#     modelId="anthropic.claude-3-5-sonnet-20240620-v1:0",
-#     messages=message_list,
-#     inferenceConfig={
-#         "maxTokens": 2000,
-#         "temperature": 0
-#     },
-# )
-
-# response_message = response['output']['message']
-# print(json.dumps(response_message, indent=4))
 
