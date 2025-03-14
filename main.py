@@ -51,6 +51,10 @@ tool_list = [
                                         "type": "string",
                                         "description": "The name of the entity."
                                     },
+                                    "entityIsAUser":{
+                                        "type": "boolean",
+                                        "description": "Decribes if the entity is a kind of user on the app, this will be helpful to set up authentication."
+                                    },
                                     "attributes": {
                                         "type": "array",
                                         "items": {
@@ -60,9 +64,13 @@ tool_list = [
                                                     "type": "string",
                                                     "description": "The name of the attribute."
                                                 },
-                                                "dataType": {
+                                                "attributeDataType": {
                                                     "type": "string",
                                                     "description": "The data type of the attribute."
+                                                },
+                                                "attributeCanBeUserName":{
+                                                    "type": "boolean",
+                                                    "description": "This defines if the user can use the attribute as a username for authentication"
                                                 },
                                                 "isPrimaryKey": {
                                                     "type": "boolean",
@@ -88,11 +96,11 @@ tool_list = [
                                                     
                                                 }
                                             },
-                                            "required": ["attributeName", "DataType", "isPrimaryKey", "foreignKey"]
+                                            "required": ["attributeName", "attributeCanBeUserName","attributeDataType", "isPrimaryKey", "foreignKey"]
                                         }
                                     }
                                 },
-                                "required": ["entityName", "attributes"]
+                                "required": ["entityName", "entityIsAUser","attributes"]
                             }
                         },
                         "response": {
@@ -221,7 +229,4 @@ def get_response(prompt, system_prompt=None):
             return None     
     except Exception as e:
         print(f"An error occurred: {e}")
-
-
-
 

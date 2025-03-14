@@ -122,7 +122,47 @@ def bulk_create_attribute(bearer_token,payload):
     response = call_api(url, method, headers=headers, payload=payload)
     return response
 
-base_url_deploy = "http://23.23.234.61:8008"
+def create_auth_config(bearer_token,payload):
+    url = base_url + f"/api/{stage}/authentication-config/create"  
+    method = "POST"
+    
+    headers = {
+        "Authorization": bearer_token,  
+        "Content-Type": "application/json"
+    }
+    
+    # Merge default values with user input
+    payload = {
+        "authenticationConfigApplicationId": payload.get("authenticationConfigApplicationId",None),
+        "authenticationConfigGenerateLink":  payload.get("authenticationConfigGenerateLink",None),
+        "authenticationConfigGenerateOtp":  payload.get("authenticationConfigGenerateOtp",None),
+        "authenticationConfigIsPasswordEncrypted":  payload.get("authenticationConfigIsPasswordEncrypted",None),
+        "authenticationConfigNonReusableRecentPassword":  payload.get("authenticationConfigNonReusableRecentPassword",None),
+        "authenticationConfigPasswordAttribute":  payload.get("authenticationConfigPasswordAttribute",None),
+        "authenticationConfigRoleIdAttribute":  payload.get("authenticationConfigRoleIdAttribute",None),
+        "authenticationConfigSendEmail":  payload.get("authenticationConfigSendEmail",None),
+        "authenticationConfigSendSms":  payload.get("authenticationConfigSendSms",None),
+        "authenticationConfigUserEntity":  payload.get("authenticationConfigUserEntity",None),
+        "authenticationConfigUsernameAttribute":  payload.get("authenticationConfigUsernameAttribute",None)
+        }
+    
+    response = call_api(url, method, headers=headers, payload=payload)
+    return response
+
+def get_entity_by_application_id(bearer_token,entityApplicationId):
+    url = base_url + f"/api/{stage}/entity/read-by-entity-application-id/{entityApplicationId}"  
+    method = "GET"
+    
+    headers = {
+        "Authorization": bearer_token,  
+        "Content-Type": "application/json"
+    }
+    
+    response = call_api(url, method, headers=headers, payload=None)
+    return response
+
+
+base_url_deploy = "https://api.qoonity.com"
 
 def code_deploy(applicationId):
     url = base_url_deploy + f"/{stage}/application/deploy/{applicationId}" 
@@ -133,6 +173,13 @@ def code_deploy(applicationId):
 
 def code_download(applicationId):
     url = base_url_deploy + f"/{stage}/application/download/{applicationId}" 
+    method = "GET"
+
+    #response = call_api(url, method)
+    return url
+
+def code_s3_url(applicationId):
+    url = base_url_deploy + f"/{stage}/application/s3download/{applicationId}" 
     method = "GET"
 
     response = call_api(url, method)
