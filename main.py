@@ -6,9 +6,9 @@ from botocore.exceptions import ClientError
 session = boto3.Session()
 
 
-aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-region_name = os.getenv("AWS_REGION")
+aws_access_key_id = os.getenv("aws_access_key_id")
+aws_secret_access_key = os.getenv("aws_secret_access_key")
+region_name = os.getenv("region_name")
 
 bedrock = session.client(service_name='bedrock-runtime', region_name="us-east-1", aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
 modelId = "anthropic.claude-3-5-sonnet-20240620-v1:0"
